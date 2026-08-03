@@ -17,6 +17,7 @@
 #ifndef _OS_TYPES_H
 #define _OS_TYPES_H
 
+#include <stdlib.h>
 #ifdef _LOW_ACCURACY_
 #  define X(n) (((((n)>>22)+1)>>1) - ((((n)>>22)+1)>>9))
 #  define LOOKUP_T const unsigned char
@@ -27,9 +28,11 @@
 
 /* make it easy on the folks that want to compile the libs with a
    different malloc than stdlib */
-#define _ogg_malloc  malloc
-#define _ogg_calloc  calloc
-#define _ogg_realloc realloc
+
+void *_ogg_malloc(size_t);
+#define _ogg_calloc(a,b)  zalloc((a)*(b))
+void *_ogg_realloc(void *old, size_t newsize, size_t oldsize);
+void *zalloc(size_t size);
 #define _ogg_free    free
 
 #ifdef _WIN32 

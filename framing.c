@@ -89,7 +89,7 @@ static ogg_buffer *_fetch_buffer(ogg_buffer_state *bs,long bytes){
 
     /* if the unused buffer is too small, grow it */
     if(ob->size<bytes){
-      ob->data=_ogg_realloc(ob->data,bytes);
+      ob->data=_ogg_realloc(ob->data,bytes,ob->size);
       ob->size=bytes;
     }
   }else{
@@ -138,7 +138,7 @@ static void ogg_buffer_realloc(ogg_reference *or,long bytes){
   
   /* if the unused buffer is too small, grow it */
   if(ob->size<bytes){
-    ob->data=_ogg_realloc(ob->data,bytes);
+    ob->data=_ogg_realloc(ob->data,bytes, ob->size);
     ob->size=bytes;
   }
 }

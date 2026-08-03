@@ -17,10 +17,12 @@
  ********************************************************************/
 
 #include <stdlib.h>
-#include <stdio.h>
-#include <errno.h>
 #include <string.h>
 #include <math.h>
+
+int ogg_errno;
+
+#define errno ogg_errno
 
 #include "codec_internal.h"
 #include "ivorbisfile.h"
@@ -791,16 +793,6 @@ int ov_open_callbacks(void *f,OggVorbis_File *vf,char *initial,long ibytes,
   return _ov_open2(vf);
 }
 
-int ov_open(FILE *f,OggVorbis_File *vf,char *initial,long ibytes){
-  ov_callbacks callbacks = {
-    (size_t (*)(void *, size_t, size_t, void *))  fread,
-    (int (*)(void *, ogg_int64_t, int))              _fseek64_wrap,
-    (int (*)(void *))                             fclose,
-    (long (*)(void *))                            ftell
-  };
-
-  return ov_open_callbacks((void *)f, vf, initial, ibytes, callbacks);
-}
   
 /* Only partially open the vorbis file; test for Vorbisness, and load
    the headers for the first chain.  Do not seek (although test for
@@ -813,17 +805,6 @@ int ov_test_callbacks(void *f,OggVorbis_File *vf,char *initial,long ibytes,
   return _ov_open1(f,vf,initial,ibytes,callbacks);
 }
 
-int ov_test(FILE *f,OggVorbis_File *vf,char *initial,long ibytes){
-  ov_callbacks callbacks = {
-    (size_t (*)(void *, size_t, size_t, void *))  fread,
-    (int (*)(void *, ogg_int64_t, int))              _fseek64_wrap,
-    (int (*)(void *))                             fclose,
-    (long (*)(void *))                            ftell
-  };
-
-  return ov_test_callbacks((void *)f, vf, initial, ibytes, callbacks);
-}
-  
 int ov_test_open(OggVorbis_File *vf){
   if(vf->ready_state!=PARTOPEN)return OV_EINVAL;
   return _ov_open2(vf);
