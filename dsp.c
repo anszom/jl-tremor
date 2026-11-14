@@ -16,6 +16,7 @@
  ********************************************************************/
 
 #include <stdlib.h> 
+#include <string.h>
 #include "ogg.h"
 #include "mdct.h"
 #include "ivorbiscodec.h"
@@ -112,6 +113,66 @@ static LOOKUP_T *_vorbis_window(int left){
   }
 }
 
+typedef struct {
+  LOOKUP_T *flash, *ram;
+} cache_entry_t;
+
+/* Only two block sizes are used at a time, but a file can consist of
+ * many segments with varying block sizes. 8 covers all block sizes, the
+ * provided buffer size will constrain the number that we can actually fit.
+ */
+#define CACHE_ENTRIES 8
+static struct cache_header {
+  cache_entry_t entries[CACHE_ENTRIES];
+  unsigned char *start, *cur, *end;
+} *cache = 0;
+
+static LOOKUP_T *cache_lookup(LOOKUP_T *src, unsigned int size)
+{
+  int i;
+  for(i=0;i<CACHE_ENTRIES;i++) {
+    if(cache->entries[i].flash == src)
+      return cache->entries[i].ram;
+    if(cache->entries[i].flash == 0)
+      break;
+  }
+
+  if(size > cache->end - cache->start)
+    return src; /* won't fit anyway */
+
+  if(i==CACHE_ENTRIES || size > cache->end - cache->cur) {
+    /* flush */
+    memset(&cache->entries, 0, sizeof(cache->entries));
+    cache->cur = cache->start;
+    i=0;
+  }
+
+  cache->entries[i].flash = (LOOKUP_T*)src;
+  cache->entries[i].ram = (LOOKUP_T*)cache->cur;
+  cache->cur += size;
+  memcpy((void*)cache->entries[i].ram, src, size);
+  return cache->entries[i].ram;
+}
+
+void vorbis_dsp_set_cache_area(unsigned char *start, unsigned int size)
+{
+  if(size > sizeof(*cache)) {
+    cache = (struct cache_header*)start;
+    memset(cache, 0, sizeof(*cache));
+    cache->start = cache->cur = start + sizeof(*cache);
+    cache->end = start+size;
+  } else
+    cache = 0;
+}
+
+static LOOKUP_T *_vorbis_window_cached(int left){
+  LOOKUP_T *rv = _vorbis_window(left);
+  if(!rv || !cache)
+    return rv;
+
+  return cache_lookup(rv, left * sizeof(LOOKUP_T));
+}
+
 /* pcm==0 indicates we just want the pending samples, no more */
 int vorbis_dsp_pcmout(vorbis_dsp_state *v,ogg_int16_t *pcm,int samples){
   vorbis_info *vi=v->vi;
@@ -124,8 +185,8 @@ int vorbis_dsp_pcmout(vorbis_dsp_state *v,ogg_int16_t *pcm,int samples){
       for(i=0;i<vi->channels;i++)
 	mdct_unroll_lap(ci->blocksizes[0],ci->blocksizes[1],
 			v->lW,v->W,v->work[i],v->mdctright[i],
-			_vorbis_window(ci->blocksizes[0]>>1),
-			_vorbis_window(ci->blocksizes[1]>>1),
+			_vorbis_window_cached(ci->blocksizes[0]>>1),
+			_vorbis_window_cached(ci->blocksizes[1]>>1),
 			pcm+i,vi->channels,
 			v->out_begin,v->out_begin+n);
     }
